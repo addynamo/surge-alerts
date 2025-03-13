@@ -4,43 +4,53 @@ class SurgeDetector {
     constructor(windowSize = 60, thresholdStd = 2.0) {
         this.windowSize = windowSize;
         this.thresholdStd = thresholdStd;
-        this.values = [];
-        this.timestamps = [];
-        this.spikes = [];
+        this.handleData = new Map(); // Store data per handle
         this.maxSpikes = 100;
     }
 
-    addDatapoint(value) {
+    initializeHandleData(handle) {
+        if (!this.handleData.has(handle)) {
+            this.handleData.set(handle, {
+                values: [],
+                timestamps: [],
+                spikes: []
+            });
+        }
+        return this.handleData.get(handle);
+    }
+
+    addDatapoint(handle, value) {
         const currentTime = moment();
-        
+        const data = this.initializeHandleData(handle);
+
         // Add new value and timestamp
-        this.values.push(value);
-        this.timestamps.push(currentTime);
+        data.values.push(value);
+        data.timestamps.push(currentTime);
 
         // Remove old values outside the window
         const cutoffTime = moment().subtract(this.windowSize, 'minutes');
-        while (this.timestamps.length > 0 && this.timestamps[0].isBefore(cutoffTime)) {
-            this.timestamps.shift();
-            this.values.shift();
+        while (data.timestamps.length > 0 && data.timestamps[0].isBefore(cutoffTime)) {
+            data.timestamps.shift();
+            data.values.shift();
         }
 
         // Need at least 5 values for meaningful statistics
-        if (this.values.length < 5) {
+        if (data.values.length < 5) {
             return false;
         }
 
         // Calculate statistics
-        const mean = this.calculateMean(this.values);
-        const std = this.calculateStd(this.values, mean);
+        const mean = this.calculateMean(data.values);
+        const std = this.calculateStd(data.values, mean);
         const threshold = mean + (this.thresholdStd * std);
 
         // Check for spike
         const isSpike = value > threshold;
         if (isSpike) {
-            this.spikes.push({ timestamp: currentTime, value });
+            data.spikes.push({ timestamp: currentTime, value });
             // Keep only the latest spikes
-            if (this.spikes.length > this.maxSpikes) {
-                this.spikes.shift();
+            if (data.spikes.length > this.maxSpikes) {
+                data.spikes.shift();
             }
         }
 
@@ -60,30 +70,36 @@ class SurgeDetector {
         return Math.sqrt(avgSquareDiff);
     }
 
-    getCurrentAverage() {
-        return this.values.length ? this.calculateMean(this.values) : 0;
+    getCurrentAverage(handle) {
+        const data = this.handleData.get(handle);
+        return data && data.values.length ? this.calculateMean(data.values) : 0;
     }
 
-    getRecentValues() {
-        return this.values.map((value, index) => ({
-            timestamp: this.timestamps[index].toISOString(),
+    getRecentValues(handle) {
+        const data = this.handleData.get(handle);
+        if (!data) return [];
+        return data.values.map((value, index) => ({
+            timestamp: data.timestamps[index].toISOString(),
             value
         }));
     }
 
-    getRecentSpikes() {
-        return this.spikes.map(spike => ({
+    getRecentSpikes(handle) {
+        const data = this.handleData.get(handle);
+        if (!data) return [];
+        return data.spikes.map(spike => ({
             timestamp: spike.timestamp.toISOString(),
             value: spike.value
         }));
     }
 
-    getThreshold() {
-        if (this.values.length < 5) {
+    getThreshold(handle) {
+        const data = this.handleData.get(handle);
+        if (!data || data.values.length < 5) {
             return null;
         }
-        const mean = this.calculateMean(this.values);
-        const std = this.calculateStd(this.values, mean);
+        const mean = this.calculateMean(data.values);
+        const std = this.calculateStd(data.values, mean);
         return mean + (this.thresholdStd * std);
     }
 
