@@ -1,65 +1,105 @@
 const express = require('express');
-const SurgeDetector = require('./surgeDetector');
+const { sequelize } = require('./models');
+const ReplyService = require('./services/replyService');
+const winston = require('winston');
+
+const logger = winston.createLogger({
+    level: 'info',
+    format: winston.format.json(),
+    transports: [new winston.transports.Console()]
+});
 
 const app = express();
 app.use(express.json());
 
-// Initialize surge detector with 1-hour window and default threshold of 2 standard deviations
-const surgeDetector = new SurgeDetector(60, 2.0);
+// Health check endpoint
+app.get('/', (req, res) => {
+    res.json({
+        status: 'healthy',
+        message: 'Social media surge detection service is running'
+    });
+});
 
-// Record new hidden reply count and check for surge
-app.post('/api/hidden-replies', (req, res) => {
+// Store new reply
+app.post('/api/replies', async (req, res) => {
     try {
-        const { count } = req.body;
-        if (count === undefined) {
-            return res.status(400).json({ error: 'Missing hidden reply count in request' });
+        logger.debug('Received store_reply request');
+        const { handle, reply_id, content } = req.body;
+
+        if (!handle || !reply_id || !content) {
+            return res.status(400).json({ error: 'Missing required fields' });
         }
 
-        const isSpike = surgeDetector.addDatapoint(parseFloat(count));
+        const reply = await ReplyService.storeReply(handle, reply_id, content);
+
         res.json({
-            recorded: true,
-            is_surge: isSpike,
-            current_count: count,
-            hourly_average: surgeDetector.getCurrentAverage(),
-            threshold: surgeDetector.getThreshold()
+            stored: true,
+            is_hidden: reply.isHidden,
+            hidden_by_word: reply.hiddenByWord
         });
     } catch (error) {
-        console.error('Error processing hidden replies:', error);
+        logger.error('Error storing reply:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
 
-// Get current metrics
-app.get('/api/metrics', (req, res) => {
+// Add new denyword
+app.post('/api/denywords', async (req, res) => {
     try {
-        res.json({
-            hourly_average: surgeDetector.getCurrentAverage(),
-            recent_values: surgeDetector.getRecentValues(),
-            recent_surges: surgeDetector.getRecentSpikes(),
-            current_threshold: surgeDetector.getThreshold()
-        });
-    } catch (error) {
-        console.error('Error fetching metrics:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
+        logger.debug('Received add_denyword request');
+        const { handle, word } = req.body;
 
-// Update surge detector configuration
-app.post('/api/config', (req, res) => {
-    try {
-        const { threshold_std } = req.body;
-        if (threshold_std) {
-            surgeDetector.setThreshold(parseFloat(threshold_std));
+        if (!handle || !word) {
+            return res.status(400).json({ error: 'Missing required fields' });
         }
-        res.json({ success: true });
+
+        const { denyword, newlyHidden } = await ReplyService.addDenyword(handle, word);
+
+        res.json({
+            added: true,
+            newly_hidden_count: newlyHidden.length,
+            newly_hidden_replies: newlyHidden.map(reply => ({
+                reply_id: reply.replyId,
+                hidden_at: reply.hiddenAt.toISOString()
+            }))
+        });
     } catch (error) {
-        console.error('Error updating configuration:', error);
+        logger.error('Error adding denyword:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
 
-// Start server
+// Get hidden replies for a handle
+app.get('/api/hidden-replies/:handle', async (req, res) => {
+    try {
+        logger.debug(`Fetching hidden replies for handle: ${req.params.handle}`);
+        const replies = await ReplyService.getHiddenReplies(req.params.handle);
+
+        res.json({
+            hidden_replies: replies.map(reply => ({
+                reply_id: reply.replyId,
+                content: reply.content,
+                hidden_at: reply.hiddenAt.toISOString(),
+                hidden_by_word: reply.hiddenByWord
+            }))
+        });
+    } catch (error) {
+        logger.error('Error fetching hidden replies:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Initialize database and start server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Surge detection service running on port ${PORT}`);
+
+sequelize.sync().then(() => {
+    logger.info('Database tables created successfully');
+    app.listen(PORT, '0.0.0.0', () => {
+        logger.info(`Server running on port ${PORT}`);
+    });
+}).catch(error => {
+    logger.error('Error initializing database:', error);
+    process.exit(1);
 });
+
+module.exports = app;
