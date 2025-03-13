@@ -12,5 +12,6 @@ dependencies = [
     "psycopg2-binary>=2.9.10",
     "python-dotenv>=1.0.1",
     "sendgrid>=6.11.0",
+    "sqlalchemy>=2.0.39",
     "twilio>=9.5.0",
 ]
