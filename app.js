@@ -1,48 +1,42 @@
 const express = require('express');
-const path = require('path');
 const SurgeDetector = require('./surgeDetector');
 
 const app = express();
 app.use(express.json());
-app.use(express.static('public'));
 
 // Initialize surge detector with 1-hour window and default threshold of 2 standard deviations
 const surgeDetector = new SurgeDetector(60, 2.0);
 
-// Serve the dashboard
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// Record new activity data point
-app.post('/api/activity', (req, res) => {
+// Record new hidden reply count and check for surge
+app.post('/api/hidden-replies', (req, res) => {
     try {
-        const { value } = req.body;
-        if (value === undefined) {
-            return res.status(400).json({ error: 'Missing value in request' });
+        const { count } = req.body;
+        if (count === undefined) {
+            return res.status(400).json({ error: 'Missing hidden reply count in request' });
         }
 
-        const isSpike = surgeDetector.addDatapoint(parseFloat(value));
+        const isSpike = surgeDetector.addDatapoint(parseFloat(count));
         res.json({
             recorded: true,
-            is_spike: isSpike,
-            current_value: value,
-            current_average: surgeDetector.getCurrentAverage()
+            is_surge: isSpike,
+            current_count: count,
+            hourly_average: surgeDetector.getCurrentAverage(),
+            threshold: surgeDetector.getThreshold()
         });
     } catch (error) {
-        console.error('Error processing activity:', error);
+        console.error('Error processing hidden replies:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
 
-// Get current metrics for dashboard
+// Get current metrics
 app.get('/api/metrics', (req, res) => {
     try {
         res.json({
-            current_average: surgeDetector.getCurrentAverage(),
+            hourly_average: surgeDetector.getCurrentAverage(),
             recent_values: surgeDetector.getRecentValues(),
-            recent_spikes: surgeDetector.getRecentSpikes(),
-            threshold: surgeDetector.getThreshold()
+            recent_surges: surgeDetector.getRecentSpikes(),
+            current_threshold: surgeDetector.getThreshold()
         });
     } catch (error) {
         console.error('Error fetching metrics:', error);
@@ -64,8 +58,8 @@ app.post('/api/config', (req, res) => {
     }
 });
 
-// Start server on port 5000
+// Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log(`Surge detection service running on port ${PORT}`);
 });
