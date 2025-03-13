@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Surge Detection Dashboard</title>
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container py-4">
+        <h1 class="mb-4">Surge Detection Dashboard</h1>
+        
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Current Metrics</h5>
+                        <p>Current Average: <span id="currentAverage">-</span></p>
+                        <p>Current Threshold: <span id="currentThreshold">-</span></p>
+                        <p>Recent Spikes: <span id="recentSpikes">-</span></p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Configuration</h5>
+                        <div class="mb-3">
+                            <label for="thresholdInput" class="form-label">Threshold (standard deviations)</label>
+                            <input type="number" class="form-control" id="thresholdInput" value="2.0" step="0.1" min="0.1">
+                        </div>
+                        <button class="btn btn-primary" onclick="updateConfig()">Update Configuration</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Activity Monitor</h5>
+                <canvas id="activityChart"></canvas>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Test Activity</h5>
+                <div class="mb-3">
+                    <label for="activityValue" class="form-label">Activity Value</label>
+                    <input type="number" class="form-control" id="activityValue" value="1.0" step="0.1">
+                </div>
+                <button class="btn btn-primary" onclick="sendActivity()">Send Activity</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/dashboard.js"></script>
+</body>
+</html>
