@@ -51,7 +51,9 @@ SENDGRID_API_KEY=your_sendgrid_api_key
 
 For detailed API documentation, see [API_DOCS.md](API_DOCS.md)
 
-## Installation
+## Setup Instructions
+
+### Local Development
 
 1. Clone the repository:
 ```bash
@@ -73,6 +75,31 @@ cp .env.example .env
 4. Start the server:
 ```bash
 npm start
+```
+
+### GitHub Repository Setup
+
+1. Create a new repository on GitHub:
+   - Go to github.com
+   - Click "New repository"
+   - Name it "surge-alert-system"
+   - Add a description
+   - Initialize with README (if starting fresh)
+
+2. Configure your local repository:
+```bash
+# If you haven't initialized git yet:
+git init
+
+# Add the remote repository
+git remote add origin https://github.com/yourusername/surge-alert-system.git
+
+# Add and commit your files
+git add .
+git commit -m "Initial commit"
+
+# Push to GitHub
+git push -u origin main
 ```
 
 ## Development
