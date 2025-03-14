@@ -4,7 +4,6 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy import text
-from surge_alert_routes import surge_alert_bp
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -30,12 +29,9 @@ db = SQLAlchemy(model_class=Base)
 db.init_app(app)
 
 # Import models here to avoid circular imports
-from models import Handle, Reply, DenyWord, SurgeAlertConfig, SurgeAlert  # noqa: E402
+import models  # noqa: E402
 
-# Register blueprints
-app.register_blueprint(surge_alert_bp)
-
-# Create database tables
+# Initialize database tables and indexes
 with app.app_context():
     db.create_all()
     logger.info("Database tables created successfully")
@@ -49,7 +45,12 @@ with app.app_context():
     db.session.commit()
     logger.info("Database indexes created successfully")
 
+# Import and register blueprints after database initialization
+from surge_alert_routes import surge_alert_bp  # noqa: E402
+app.register_blueprint(surge_alert_bp)
+
 from reply_service import ReplyService
+from flask import request, jsonify
 
 @app.route('/')
 def health_check():
