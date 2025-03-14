@@ -1,7 +1,7 @@
 const express = require('express');
 const { Handle } = require('../models');
 const SurgeAlertService = require('../services/surgeAlertService');
-const EmailService = require('../emailService');
+const EmailService = require('../services/emailService');
 const winston = require('winston');
 
 const router = express.Router();

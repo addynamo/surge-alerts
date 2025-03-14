@@ -1,5 +1,5 @@
 const express = require('express');
-const { sequelize } = require('./models');
+const { sequelize, Handle, Reply } = require('./models');
 const ReplyService = require('./services/replyService');
 const SurgeAlertService = require('./services/surgeAlertService');
 const surgeAlertRoutes = require('./routes/surgeAlertRoutes');
@@ -25,22 +25,54 @@ app.get('/', (req, res) => {
     });
 });
 
-// Store new reply
-app.post('/api/replies', async (req, res) => {
+// Create handle endpoint
+app.post('/api/handles', async (req, res) => {
     try {
-        logger.debug('Received store_reply request');
-        const { handle, reply_id, content } = req.body;
-
-        if (!handle || !reply_id || !content) {
-            return res.status(400).json({ error: 'Missing required fields' });
+        const { handle } = req.body;
+        if (!handle) {
+            return res.status(400).json({ error: 'Handle is required' });
         }
 
-        const reply = await ReplyService.storeReply(handle, reply_id, content);
+        const [handleObj, created] = await Handle.findOrCreate({
+            where: { handle }
+        });
+
+        res.status(created ? 201 : 200).json({
+            id: handleObj.id,
+            handle: handleObj.handle,
+            created: created
+        });
+    } catch (error) {
+        logger.error('Error creating handle:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Store reply endpoint
+app.post('/api/replies', async (req, res) => {
+    try {
+        const { handle, replyId, content, isHidden, hiddenAt } = req.body;
+
+        // Find or create handle
+        const handleObj = await Handle.findOne({ where: { handle } });
+        if (!handleObj) {
+            return res.status(404).json({ error: 'Handle not found' });
+        }
+
+        // Create reply
+        const reply = await Reply.create({
+            replyId,
+            content,
+            isHidden: isHidden || false,
+            hiddenAt: hiddenAt || null,
+            HandleId: handleObj.id
+        });
 
         res.json({
-            stored: true,
-            is_hidden: reply.isHidden,
-            hidden_by_word: reply.hiddenByWord
+            id: reply.id,
+            replyId: reply.replyId,
+            isHidden: reply.isHidden,
+            hiddenAt: reply.hiddenAt
         });
     } catch (error) {
         logger.error('Error storing reply:', error);
@@ -116,7 +148,7 @@ async function startServer() {
         logger.info('Database tables created successfully');
 
         const server = app.listen(5000, '0.0.0.0', () => {
-            logger.info(`Server running on port 5000`);
+            logger.info('Server running on port 5000');
 
             // Start surge evaluation schedule
             setInterval(evaluateSurges, 5 * 60 * 1000); // Run every 5 minutes

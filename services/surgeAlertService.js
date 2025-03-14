@@ -113,17 +113,20 @@ class SurgeAlertService {
 
     static async evaluateSurges() {
         try {
+            logger.info('Starting surge evaluation...');
             const configs = await SurgeAlertConfig.findAll({
                 where: { enabled: true },
                 include: [Handle]
             });
 
+            logger.info(`Found ${configs.length} active configurations to evaluate`);
             const now = moment();
             const results = [];
 
             for (const config of configs) {
+                logger.info(`Evaluating config ${config.id} for handle ${config.Handle?.handle}`);
                 const periodStart = moment().subtract(config.surgeReplyPeriodInMs, 'milliseconds');
-                
+
                 // Count hidden replies in the period
                 const hiddenCount = await Reply.count({
                     where: {
@@ -135,7 +138,10 @@ class SurgeAlertService {
                     }
                 });
 
+                logger.info(`Found ${hiddenCount} hidden replies in the last ${config.surgeReplyPeriodInMs}ms (threshold: ${config.surgeReplyCountPerPeriod})`);
+
                 if (hiddenCount >= config.surgeReplyCountPerPeriod) {
+                    logger.info('Threshold exceeded, checking cooldown period...');
                     // Check cooldown period
                     const lastAlert = await SurgeAlert.findOne({
                         where: { configId: config.id },
@@ -147,9 +153,11 @@ class SurgeAlertService {
                         const cooldownEnd = moment(lastAlert.createdAt)
                             .add(config.alertCooldownPeriodInMs, 'milliseconds');
                         cooldownPassed = now.isAfter(cooldownEnd);
+                        logger.info(`Cooldown period ${cooldownPassed ? 'has passed' : 'is still active'}`);
                     }
 
                     if (cooldownPassed) {
+                        logger.info('Creating new surge alert...');
                         // Create new surge alert
                         const alert = await SurgeAlert.create({
                             configId: config.id,
@@ -162,6 +170,7 @@ class SurgeAlertService {
                             }
                         });
                         results.push(alert);
+                        logger.info(`Created surge alert with ID ${alert.id}`);
                     }
                 }
 
@@ -169,6 +178,7 @@ class SurgeAlertService {
                 await config.update({ lastEvaluatedAt: now.toDate() });
             }
 
+            logger.info(`Surge evaluation complete. Created ${results.length} new alerts.`);
             return results;
         } catch (error) {
             logger.error('Error evaluating surges:', error);
