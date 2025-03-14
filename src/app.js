@@ -1,22 +1,16 @@
 const express = require('express');
-const winston = require('winston');
-const { sequelize } = require('./models');
-const surgeAlertRoutes = require('./routes/surgeAlertRoutes');
+const { Handle } = require('./models');
+const ReplyService = require('./services/replyService');
 const SurgeAlertService = require('./services/surgeAlertService');
-
-// Configure logging
-const logger = winston.createLogger({
-    level: 'info',
-    format: winston.format.json(),
-    transports: [new winston.transports.Console()]
-});
+const surgeAlertRoutes = require('./routes/surgeAlertRoutes');
+const { logger } = require('./config/logger');
 
 // Initialize Express app
 const app = express();
 app.use(express.json());
 
 // Mount routes
-app.use('/', surgeAlertRoutes);
+app.use('/api', surgeAlertRoutes); // Mount under /api prefix
 
 // Health check endpoint
 app.get('/', (req, res) => {
@@ -92,17 +86,9 @@ async function evaluateSurges() {
     }
 }
 
+// Start the server
 async function startServer() {
     try {
-        // Test database connection
-        await sequelize.authenticate();
-        logger.info('Database connection established successfully');
-
-        // Sync database schema
-        await sequelize.sync();
-        logger.info('Database tables created successfully');
-
-        // Start the server
         const server = app.listen(5000, '0.0.0.0', () => {
             logger.info('Server running on port 5000');
 
