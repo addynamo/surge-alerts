@@ -53,7 +53,7 @@ app.post('/api/replies', async (req, res) => {
     try {
         const { handle, replyId, content, isHidden, hiddenAt } = req.body;
 
-        // Find or create handle
+        // Find handle
         const handleObj = await Handle.findOne({ where: { handle } });
         if (!handleObj) {
             return res.status(404).json({ error: 'Handle not found' });
@@ -80,52 +80,6 @@ app.post('/api/replies', async (req, res) => {
     }
 });
 
-// Add new denyword
-app.post('/api/denywords', async (req, res) => {
-    try {
-        logger.debug('Received add_denyword request');
-        const { handle, word } = req.body;
-
-        if (!handle || !word) {
-            return res.status(400).json({ error: 'Missing required fields' });
-        }
-
-        const result = await ReplyService.addDenyword(handle, word);
-
-        res.json({
-            added: true,
-            newly_hidden_count: result.newlyHidden.length,
-            newly_hidden_replies: result.newlyHidden.map(reply => ({
-                reply_id: reply.replyId,
-                hidden_at: reply.hiddenAt.toISOString()
-            }))
-        });
-    } catch (error) {
-        logger.error('Error adding denyword:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
-
-// Get hidden replies for a handle
-app.get('/api/hidden-replies/:handle', async (req, res) => {
-    try {
-        logger.debug(`Fetching hidden replies for handle: ${req.params.handle}`);
-        const replies = await ReplyService.getHiddenReplies(req.params.handle);
-
-        res.json({
-            hidden_replies: replies.map(reply => ({
-                reply_id: reply.replyId,
-                content: reply.content,
-                hidden_at: reply.hiddenAt.toISOString(),
-                hidden_by_word: reply.hiddenByWord
-            }))
-        });
-    } catch (error) {
-        logger.error('Error fetching hidden replies:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
-
 // Schedule surge evaluation every 5 minutes
 async function evaluateSurges() {
     try {
@@ -147,6 +101,7 @@ async function startServer() {
         await sequelize.sync();
         logger.info('Database tables created successfully');
 
+        // Start the server
         const server = app.listen(5000, '0.0.0.0', () => {
             logger.info('Server running on port 5000');
 
@@ -166,6 +121,7 @@ async function startServer() {
     }
 }
 
+// Start the server
 startServer();
 
 module.exports = app;
