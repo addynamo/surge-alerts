@@ -90,16 +90,38 @@ app.get('/api/hidden-replies/:handle', async (req, res) => {
 });
 
 // Initialize database and start server
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001; // Try alternate port if 5000 is in use
 
-sequelize.sync().then(() => {
-    logger.info('Database tables created successfully');
-    app.listen(PORT, '0.0.0.0', () => {
-        logger.info(`Server running on port ${PORT}`);
-    });
-}).catch(error => {
-    logger.error('Error initializing database:', error);
-    process.exit(1);
-});
+async function startServer() {
+    try {
+        // Test database connection
+        await sequelize.authenticate();
+        logger.info('Database connection established successfully');
+
+        // Sync database schema
+        await sequelize.sync();
+        logger.info('Database tables created successfully');
+
+        const server = app.listen(PORT, '0.0.0.0', () => {
+            logger.info(`Server running on port ${PORT}`);
+        });
+
+        server.on('error', (error) => {
+            if (error.code === 'EADDRINUSE') {
+                logger.error(`Port ${PORT} is already in use. Trying alternate port...`);
+                const newPort = PORT + 1;
+                server.listen(newPort, '0.0.0.0');
+            } else {
+                logger.error('Server error:', error);
+                process.exit(1);
+            }
+        });
+    } catch (error) {
+        logger.error('Error starting server:', error);
+        process.exit(1);
+    }
+}
+
+startServer();
 
 module.exports = app;

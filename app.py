@@ -1,8 +1,10 @@
 import os
 import logging
-from flask import Flask, request, jsonify
+from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy import text
+from surge_alert_routes import surge_alert_bp
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -28,12 +30,24 @@ db = SQLAlchemy(model_class=Base)
 db.init_app(app)
 
 # Import models here to avoid circular imports
-from models import Handle, Reply, DenyWord  # noqa: E402
+from models import Handle, Reply, DenyWord, SurgeAlertConfig, SurgeAlert  # noqa: E402
+
+# Register blueprints
+app.register_blueprint(surge_alert_bp)
 
 # Create database tables
 with app.app_context():
     db.create_all()
     logger.info("Database tables created successfully")
+
+    # Create indexes for better query performance
+    db.session.execute(text("""
+        CREATE INDEX IF NOT EXISTS idx_replies_hidden_at ON replies (hidden_at);
+        CREATE INDEX IF NOT EXISTS idx_surge_alerts_alerted_at ON reply_manager_surge_alerts (alerted_at);
+        CREATE INDEX IF NOT EXISTS idx_surge_config_enabled ON reply_manager_surge_alert_config (enabled);
+    """))
+    db.session.commit()
+    logger.info("Database indexes created successfully")
 
 from reply_service import ReplyService
 
