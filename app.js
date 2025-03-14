@@ -1,6 +1,8 @@
 const express = require('express');
 const { sequelize } = require('./models');
 const ReplyService = require('./services/replyService');
+const SurgeAlertService = require('./services/surgeAlertService');
+const surgeAlertRoutes = require('./routes/surgeAlertRoutes');
 const winston = require('winston');
 
 const logger = winston.createLogger({
@@ -11,6 +13,9 @@ const logger = winston.createLogger({
 
 const app = express();
 app.use(express.json());
+
+// Mount routes
+app.use('/', surgeAlertRoutes);
 
 // Health check endpoint
 app.get('/', (req, res) => {
@@ -53,12 +58,12 @@ app.post('/api/denywords', async (req, res) => {
             return res.status(400).json({ error: 'Missing required fields' });
         }
 
-        const { denyword, newlyHidden } = await ReplyService.addDenyword(handle, word);
+        const result = await ReplyService.addDenyword(handle, word);
 
         res.json({
             added: true,
-            newly_hidden_count: newlyHidden.length,
-            newly_hidden_replies: newlyHidden.map(reply => ({
+            newly_hidden_count: result.newlyHidden.length,
+            newly_hidden_replies: result.newlyHidden.map(reply => ({
                 reply_id: reply.replyId,
                 hidden_at: reply.hiddenAt.toISOString()
             }))
@@ -89,8 +94,16 @@ app.get('/api/hidden-replies/:handle', async (req, res) => {
     }
 });
 
-// Initialize database and start server
-const PORT = process.env.PORT || 5001; // Try alternate port if 5000 is in use
+// Schedule surge evaluation every 5 minutes
+async function evaluateSurges() {
+    try {
+        logger.info('Starting surge evaluation...');
+        const newAlerts = await SurgeAlertService.evaluateSurges();
+        logger.info(`Surge evaluation complete. Created ${newAlerts.length} new alerts.`);
+    } catch (error) {
+        logger.error('Error during surge evaluation:', error);
+    }
+}
 
 async function startServer() {
     try {
@@ -102,19 +115,18 @@ async function startServer() {
         await sequelize.sync();
         logger.info('Database tables created successfully');
 
-        const server = app.listen(PORT, '0.0.0.0', () => {
-            logger.info(`Server running on port ${PORT}`);
+        const server = app.listen(5000, '0.0.0.0', () => {
+            logger.info(`Server running on port 5000`);
+
+            // Start surge evaluation schedule
+            setInterval(evaluateSurges, 5 * 60 * 1000); // Run every 5 minutes
+            // Run initial evaluation
+            evaluateSurges();
         });
 
         server.on('error', (error) => {
-            if (error.code === 'EADDRINUSE') {
-                logger.error(`Port ${PORT} is already in use. Trying alternate port...`);
-                const newPort = PORT + 1;
-                server.listen(newPort, '0.0.0.0');
-            } else {
-                logger.error('Server error:', error);
-                process.exit(1);
-            }
+            logger.error('Server error:', error);
+            process.exit(1);
         });
     } catch (error) {
         logger.error('Error starting server:', error);
