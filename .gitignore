@@ -23,6 +23,24 @@ logs/
 .DS_Store
 Thumbs.db
 
+# Dependencies
+package-lock.json
+yarn.lock
+
+# Build
+dist/
+build/
+coverage/
+
+# Temporary files
+tmp/
+temp/
+
+# Local development
+.env.development
+.env.test
+.env.production
+
 # Replit specific
 .replit
 replit.nix

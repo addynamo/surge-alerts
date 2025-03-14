@@ -11,6 +11,29 @@ A robust Node.js microservice for advanced social media surge detection, deliver
 - RESTful API endpoints
 - PostgreSQL database integration
 
+## Tech Stack
+
+- Node.js 20.x
+- PostgreSQL (via Sequelize ORM)
+- SendGrid for email notifications
+- Winston for logging
+- Express.js for API routing
+- Moment.js for time manipulation
+
+## Project Structure
+
+```
+surge-alert-system/
+├── src/
+│   ├── models/         # Database models
+│   ├── services/       # Business logic
+│   ├── routes/         # API routes
+│   └── utils/          # Helper functions
+├── tests/              # Test files
+├── config/             # Configuration files
+└── docs/              # Documentation
+```
+
 ## Prerequisites
 
 - Node.js v20 or higher
@@ -19,17 +42,12 @@ A robust Node.js microservice for advanced social media surge detection, deliver
 
 ## Environment Variables
 
-```
+```env
 DATABASE_URL=postgresql://user:password@host:5432/dbname
 SENDGRID_API_KEY=your_sendgrid_api_key
 ```
 
 ## API Documentation
-
-### Base URL
-```
-https://your-domain.com
-```
 
 For detailed API documentation, see [API_DOCS.md](API_DOCS.md)
 
